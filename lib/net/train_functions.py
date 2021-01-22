@@ -18,35 +18,35 @@ def model_joint_fn_decorator():
 
             if not cfg.RPN.FIXED:
                 rpn_cls_label, rpn_reg_label = data['rpn_cls_label'], data['rpn_reg_label']
-                rpn_cls_label = torch.from_numpy(rpn_cls_label).cuda(non_blocking = True).long()
-                rpn_reg_label = torch.from_numpy(rpn_reg_label).cuda(non_blocking = True).float()
+                rpn_cls_label = torch.from_numpy(rpn_cls_label).cuda(non_blocking=True).long()
+                rpn_reg_label = torch.from_numpy(rpn_reg_label).cuda(non_blocking=True).float()
 
-            inputs = torch.from_numpy(pts_input).cuda(non_blocking = True).float()
-            gt_boxes3d = torch.from_numpy(gt_boxes3d).cuda(non_blocking = True).float()
-            input_data = { 'pts_input': inputs, 'gt_boxes3d': gt_boxes3d }
+            inputs = torch.from_numpy(pts_input).cuda(non_blocking=True).float()
+            gt_boxes3d = torch.from_numpy(gt_boxes3d).cuda(non_blocking=True).float()
+            input_data = {'pts_input': inputs, 'gt_boxes3d': gt_boxes3d}
         else:
-            input_data = { }
+            input_data = {}
             for key, val in data.items():
                 if key != 'sample_id':
-                    input_data[key] = torch.from_numpy(val).contiguous().cuda(non_blocking = True).float()
+                    input_data[key] = torch.from_numpy(val).contiguous().cuda(non_blocking=True).float()
             if not cfg.RCNN.ROI_SAMPLE_JIT:
-                pts_input = torch.cat((input_data['pts_input'], input_data['pts_features']), dim = -1)
+                pts_input = torch.cat((input_data['pts_input'], input_data['pts_features']), dim=-1)
                 input_data['pts_input'] = pts_input
         # input()
         if cfg.LI_FUSION.ENABLED:
-            img = torch.from_numpy(data['img']).cuda(non_blocking = True).float().permute((0, 3, 1, 2))
-            pts_origin_xy = torch.from_numpy(data['pts_origin_xy']).cuda(non_blocking = True).float()
+            img = torch.from_numpy(data['img']).cuda(non_blocking=True).float().permute((0, 3, 1, 2))
+            pts_origin_xy = torch.from_numpy(data['pts_origin_xy']).cuda(non_blocking=True).float()
             input_data['img'] = img
             input_data['pts_origin_xy'] = pts_origin_xy
         if cfg.RPN.USE_RGB or cfg.RCNN.USE_RGB:
             pts_rgb = data['rgb']
             # print(pts_rgb.shape)
-            pts_rgb = torch.from_numpy(pts_rgb).cuda(non_blocking = True).float()
+            pts_rgb = torch.from_numpy(pts_rgb).cuda(non_blocking=True).float()
             input_data['pts_rgb'] = pts_rgb
         ret_dict = model(input_data)
 
-        tb_dict = { }
-        disp_dict = { }
+        tb_dict = {}
+        disp_dict = {}
         loss = 0
         if cfg.RPN.ENABLED and not cfg.RPN.FIXED:
             rpn_cls, rpn_reg = ret_dict['rpn_cls'], ret_dict['rpn_reg']
@@ -68,7 +68,7 @@ def model_joint_fn_decorator():
 
         if cfg.RCNN.ENABLED:
             if cfg.USE_IOU_BRANCH:
-                rcnn_loss,iou_loss,iou_branch_loss = get_rcnn_loss(model, ret_dict, tb_dict)
+                rcnn_loss, iou_loss, iou_branch_loss = get_rcnn_loss(model, ret_dict, tb_dict)
                 disp_dict['reg_fg_sum'] = tb_dict['rcnn_reg_fg']
 
                 rcnn_loss = rcnn_loss * cfg.TRAIN.RCNN_TRAIN_WEIGHT
@@ -85,7 +85,6 @@ def model_joint_fn_decorator():
                 disp_dict['rcnn_loss'] = rcnn_loss.item()
                 loss += rcnn_loss
                 disp_dict['loss'] = loss.item()
-
 
         return ModelReturn(loss, tb_dict, disp_dict)
 
@@ -109,7 +108,7 @@ def model_joint_fn_decorator():
             neg = (rpn_cls_label_flat == 0).float()
             cls_weights = pos + neg
             pos_normalizer = pos.sum()
-            cls_weights = cls_weights / torch.clamp(pos_normalizer, min = 1.0)
+            cls_weights = cls_weights / torch.clamp(pos_normalizer, min=1.0)
             rpn_loss_cls = rpn_cls_loss_func(rpn_cls_flat, rpn_cls_target, cls_weights)
             rpn_loss_cls_pos = (rpn_loss_cls * pos).sum()
             rpn_loss_cls_neg = (rpn_loss_cls * neg).sum()
@@ -122,9 +121,9 @@ def model_joint_fn_decorator():
             weight[fg_mask] = cfg.RPN.FG_WEIGHT
             rpn_cls_label_target = (rpn_cls_label_flat > 0).float()
             batch_loss_cls = F.binary_cross_entropy(torch.sigmoid(rpn_cls_flat), rpn_cls_label_target,
-                                                    weight = weight, reduction = 'none')
+                                                    weight=weight, reduction='none')
             cls_valid_mask = (rpn_cls_label_flat >= 0).float()
-            rpn_loss_cls = (batch_loss_cls * cls_valid_mask).sum() / torch.clamp(cls_valid_mask.sum(), min = 1.0)
+            rpn_loss_cls = (batch_loss_cls * cls_valid_mask).sum() / torch.clamp(cls_valid_mask.sum(), min=1.0)
         else:
             raise NotImplementedError
 
@@ -136,13 +135,13 @@ def model_joint_fn_decorator():
                 loss_utils.get_reg_loss(torch.sigmoid(rpn_cls_flat)[fg_mask], torch.sigmoid(rpn_cls_flat)[fg_mask],
                                         rpn_reg.view(point_num, -1)[fg_mask],
                                         rpn_reg_label.view(point_num, 7)[fg_mask],
-                                        loc_scope = cfg.RPN.LOC_SCOPE,
-                                        loc_bin_size = cfg.RPN.LOC_BIN_SIZE,
-                                        num_head_bin = cfg.RPN.NUM_HEAD_BIN,
-                                        anchor_size = MEAN_SIZE,
-                                        get_xz_fine = cfg.RPN.LOC_XZ_FINE,
-                                        use_cls_score = True,
-                                        use_mask_score = False)
+                                        loc_scope=cfg.RPN.LOC_SCOPE,
+                                        loc_bin_size=cfg.RPN.LOC_BIN_SIZE,
+                                        num_head_bin=cfg.RPN.NUM_HEAD_BIN,
+                                        anchor_size=MEAN_SIZE,
+                                        get_xz_fine=cfg.RPN.LOC_XZ_FINE,
+                                        use_cls_score=True,
+                                        use_mask_score=False)
 
             loss_size = 3 * loss_size  # consistent with old codes
 
@@ -154,10 +153,10 @@ def model_joint_fn_decorator():
 
         rpn_loss = rpn_loss_cls * cfg.RPN.LOSS_WEIGHT[0] + rpn_loss_reg * cfg.RPN.LOSS_WEIGHT[1]
 
-        tb_dict.update({ 'rpn_loss_cls'  : rpn_loss_cls.item(), 'rpn_loss_reg': rpn_loss_reg.item(),
-                         'rpn_loss'      : rpn_loss.item(), 'rpn_fg_sum': fg_sum, 'rpn_loss_loc': loss_loc.item(),
-                         'rpn_loss_angle': loss_angle.item(), 'rpn_loss_size': loss_size.item(),
-                         'rpn_loss_iou'  : loss_iou.item() })
+        tb_dict.update({'rpn_loss_cls': rpn_loss_cls.item(), 'rpn_loss_reg': rpn_loss_reg.item(),
+                        'rpn_loss': rpn_loss.item(), 'rpn_fg_sum': fg_sum, 'rpn_loss_loc': loss_loc.item(),
+                        'rpn_loss_angle': loss_angle.item(), 'rpn_loss_size': loss_size.item(),
+                        'rpn_loss_iou': loss_iou.item()})
 
         # return rpn_loss
         return rpn_loss, rpn_loss_cls, loss_loc, loss_angle, loss_size, loss_iou
@@ -190,7 +189,7 @@ def model_joint_fn_decorator():
             neg = (cls_label_flat == 0).float()
             cls_weights = pos + neg
             pos_normalizer = pos.sum()
-            cls_weights = cls_weights / torch.clamp(pos_normalizer, min = 1.0)
+            cls_weights = cls_weights / torch.clamp(pos_normalizer, min=1.0)
 
             rcnn_loss_cls = cls_loss_func(rcnn_cls_flat, cls_target, cls_weights)
             rcnn_loss_cls_pos = (rcnn_loss_cls * pos).sum()
@@ -201,9 +200,9 @@ def model_joint_fn_decorator():
 
         elif cfg.RCNN.LOSS_CLS == 'BinaryCrossEntropy':
             rcnn_cls_flat = rcnn_cls.view(-1)
-            batch_loss_cls = F.binary_cross_entropy(torch.sigmoid(rcnn_cls_flat), cls_label, reduction = 'none')
+            batch_loss_cls = F.binary_cross_entropy(torch.sigmoid(rcnn_cls_flat), cls_label, reduction='none')
             cls_valid_mask = (cls_label_flat >= 0).float()
-            rcnn_loss_cls = (batch_loss_cls * cls_valid_mask).sum() / torch.clamp(cls_valid_mask.sum(), min = 1.0)
+            rcnn_loss_cls = (batch_loss_cls * cls_valid_mask).sum() / torch.clamp(cls_valid_mask.sum(), min=1.0)
 
         elif cfg.TRAIN.LOSS_CLS == 'CrossEntropy':
             rcnn_cls_reshape = rcnn_cls.view(rcnn_cls.shape[0], -1)
@@ -211,8 +210,8 @@ def model_joint_fn_decorator():
             cls_valid_mask = (cls_label_flat >= 0).float()
 
             batch_loss_cls = cls_loss_func(rcnn_cls_reshape, cls_target)
-            normalizer = torch.clamp(cls_valid_mask.sum(), min = 1.0)
-            rcnn_loss_cls = (batch_loss_cls.mean(dim = 1) * cls_valid_mask).sum() / normalizer
+            normalizer = torch.clamp(cls_valid_mask.sum(), min=1.0)
+            rcnn_loss_cls = (batch_loss_cls.mean(dim=1) * cls_valid_mask).sum() / normalizer
 
         else:
             raise NotImplementedError
@@ -236,26 +235,25 @@ def model_joint_fn_decorator():
                 loss_utils.get_reg_loss(torch.sigmoid(rcnn_cls_flat)[fg_mask], mask_score[fg_mask],
                                         rcnn_reg.view(batch_size, -1)[fg_mask],
                                         gt_boxes3d_ct.view(batch_size, 7)[fg_mask],
-                                        loc_scope = cfg.RCNN.LOC_SCOPE,
-                                        loc_bin_size = cfg.RCNN.LOC_BIN_SIZE,
-                                        num_head_bin = cfg.RCNN.NUM_HEAD_BIN,
-                                        anchor_size = anchor_size,
-                                        get_xz_fine = True, get_y_by_bin = cfg.RCNN.LOC_Y_BY_BIN,
-                                        loc_y_scope = cfg.RCNN.LOC_Y_SCOPE, loc_y_bin_size = cfg.RCNN.LOC_Y_BIN_SIZE,
-                                        get_ry_fine = True,
-                                        use_cls_score = True,
-                                        use_mask_score = True,
-                                        gt_iou_weight = gt_iou_weight[fg_mask],
-                                        use_iou_branch = cfg.USE_IOU_BRANCH,
-                                        iou_branch_pred = iou_branch_pred_fg_mask)
-
+                                        loc_scope=cfg.RCNN.LOC_SCOPE,
+                                        loc_bin_size=cfg.RCNN.LOC_BIN_SIZE,
+                                        num_head_bin=cfg.RCNN.NUM_HEAD_BIN,
+                                        anchor_size=anchor_size,
+                                        get_xz_fine=True, get_y_by_bin=cfg.RCNN.LOC_Y_BY_BIN,
+                                        loc_y_scope=cfg.RCNN.LOC_Y_SCOPE, loc_y_bin_size=cfg.RCNN.LOC_Y_BIN_SIZE,
+                                        get_ry_fine=True,
+                                        use_cls_score=True,
+                                        use_mask_score=True,
+                                        gt_iou_weight=gt_iou_weight[fg_mask],
+                                        use_iou_branch=cfg.USE_IOU_BRANCH,
+                                        iou_branch_pred=iou_branch_pred_fg_mask)
 
             loss_size = 3 * loss_size  # consistent with old codes
             # rcnn_loss_reg = loss_loc + loss_angle + loss_size
             loss_iou = cfg.TRAIN.CE_WEIGHT * loss_iou
             if cfg.USE_IOU_BRANCH:
                 iou_branch_loss = reg_loss_dict['iou_branch_loss']
-                rcnn_loss_reg = loss_loc + loss_angle + loss_size + loss_iou  + iou_branch_loss
+                rcnn_loss_reg = loss_loc + loss_angle + loss_size + loss_iou + iou_branch_loss
             else:
                 rcnn_loss_reg = loss_loc + loss_angle + loss_size + loss_iou
             tb_dict.update(reg_loss_dict)
@@ -282,6 +280,5 @@ def model_joint_fn_decorator():
             return rcnn_loss, loss_iou, iou_branch_loss
         else:
             return rcnn_loss
-
 
     return model_fn

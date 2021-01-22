@@ -16,7 +16,7 @@ class _PointnetSAModuleBase(nn.Module):
         self.mlps = None
         self.pool_method = 'max_pool'
 
-    def forward(self, xyz: torch.Tensor, features: torch.Tensor = None, new_xyz = None) -> (torch.Tensor, torch.Tensor):
+    def forward(self, xyz: torch.Tensor, features: torch.Tensor = None, new_xyz=None) -> (torch.Tensor, torch.Tensor):
         """
         :param xyz: (B, N, 3) tensor of the xyz coordinates of the features
         :param features: (B, N, C) tensor of the descriptors of the the features
@@ -40,8 +40,8 @@ class _PointnetSAModuleBase(nn.Module):
             if self.npoint is not None:
                 idx = pointnet2_utils.furthest_point_sample(xyz, self.npoint)
                 new_xyz = pointnet2_utils.gather_operation(
-                        xyz_flipped,
-                        idx
+                    xyz_flipped,
+                    idx
                 ).transpose(1, 2).contiguous()
             else:
                 new_xyz = None
@@ -57,11 +57,11 @@ class _PointnetSAModuleBase(nn.Module):
             new_features = self.mlps[i](new_features)  # (B, mlp[-1], npoint, nsample)
             if self.pool_method == 'max_pool':
                 new_features = F.max_pool2d(
-                        new_features, kernel_size = [1, new_features.size(3)]
+                    new_features, kernel_size=[1, new_features.size(3)]
                 )  # (B, mlp[-1], npoint, 1)
             elif self.pool_method == 'avg_pool':
                 new_features = F.avg_pool2d(
-                        new_features, kernel_size = [1, new_features.size(3)]
+                    new_features, kernel_size=[1, new_features.size(3)]
                 )  # (B, mlp[-1], npoint, 1)
             else:
                 raise NotImplementedError
@@ -69,14 +69,18 @@ class _PointnetSAModuleBase(nn.Module):
             new_features = new_features.squeeze(-1)  # (B, mlp[-1], npoint)
             new_features_list.append(new_features)
 
-        return new_xyz, torch.cat(new_features_list, dim = 1), idx
+        return new_xyz, torch.cat(new_features_list, dim=1), idx
 
 
 class PointnetSAModuleMSG(_PointnetSAModuleBase):
-    """Pointnet set abstraction layer with multiscale grouping"""
+    """
+    Pointnet set abstraction layer with multiscale grouping
+    用fps从xyz个点中挑出npoint个点，每个点用邻域球挑选nsample个邻近点
+    返回采样后的坐标new_xyz: [B, npoint, 3], 采样后的特征new_feature: [B, npoint, C], 采样点在原点云中的序号idx: [B, npoint]
+    """
 
     def __init__(self, *, npoint: int, radii: List[float], nsamples: List[int], mlps: List[List[int]], bn: bool = True,
-                 use_xyz: bool = True, pool_method = 'max_pool', instance_norm = False):
+                 use_xyz: bool = True, pool_method='max_pool', instance_norm=False):
         """
         :param npoint: int
         :param radii: list of float, list of radii to group with
@@ -98,14 +102,14 @@ class PointnetSAModuleMSG(_PointnetSAModuleBase):
             radius = radii[i]
             nsample = nsamples[i]
             self.groupers.append(
-                    pointnet2_utils.QueryAndGroup(radius, nsample, use_xyz = use_xyz)
-                    if npoint is not None else pointnet2_utils.GroupAll(use_xyz)
+                pointnet2_utils.QueryAndGroup(radius, nsample, use_xyz=use_xyz)
+                if npoint is not None else pointnet2_utils.GroupAll(use_xyz)
             )
             mlp_spec = mlps[i]
             if use_xyz:
                 mlp_spec[0] += 3
 
-            self.mlps.append(pt_utils.SharedMLP(mlp_spec, bn = bn, instance_norm = instance_norm))
+            self.mlps.append(pt_utils.SharedMLP(mlp_spec, bn=bn, instance_norm=instance_norm))
         self.pool_method = pool_method
 
 
@@ -113,7 +117,7 @@ class PointnetSAModule(PointnetSAModuleMSG):
     """Pointnet set abstraction layer"""
 
     def __init__(self, *, mlp: List[int], npoint: int = None, radius: float = None, nsample: int = None,
-                 bn: bool = True, use_xyz: bool = True, pool_method = 'max_pool', instance_norm = False):
+                 bn: bool = True, use_xyz: bool = True, pool_method='max_pool', instance_norm=False):
         """
         :param mlp: list of int, spec of the pointnet before the global max_pool
         :param npoint: int, number of features
@@ -125,21 +129,21 @@ class PointnetSAModule(PointnetSAModuleMSG):
         :param instance_norm: whether to use instance_norm
         """
         super().__init__(
-                mlps = [mlp], npoint = npoint, radii = [radius], nsamples = [nsample], bn = bn, use_xyz = use_xyz,
-                pool_method = pool_method, instance_norm = instance_norm
+            mlps=[mlp], npoint=npoint, radii=[radius], nsamples=[nsample], bn=bn, use_xyz=use_xyz,
+            pool_method=pool_method, instance_norm=instance_norm
         )
 
 
 class PointnetFPModule(nn.Module):
     r"""Propigates the features of one set to another"""
 
-    def __init__(self, *, mlp: List[int], bn: bool = True, activation = nn.ReLU(inplace = True)):
+    def __init__(self, *, mlp: List[int], bn: bool = True, activation=nn.ReLU(inplace=True)):
         """
         :param mlp: list of int
         :param bn: whether to use batchnorm
         """
         super().__init__()
-        self.mlp = pt_utils.SharedMLP(mlp, bn = bn, activation = activation)
+        self.mlp = pt_utils.SharedMLP(mlp, bn=bn, activation=activation)
 
     def forward(
             self, unknown: torch.Tensor, known: torch.Tensor, unknow_feats: torch.Tensor, known_feats: torch.Tensor
@@ -155,7 +159,7 @@ class PointnetFPModule(nn.Module):
         if known is not None:
             dist, idx = pointnet2_utils.three_nn(unknown, known)
             dist_recip = 1.0 / (dist + 1e-8)
-            norm = torch.sum(dist_recip, dim = 2, keepdim = True)
+            norm = torch.sum(dist_recip, dim=2, keepdim=True)
             weight = dist_recip / norm
 
             interpolated_feats = pointnet2_utils.three_interpolate(known_feats, idx, weight)
@@ -163,7 +167,7 @@ class PointnetFPModule(nn.Module):
             interpolated_feats = known_feats.expand(*known_feats.size()[0:2], unknown.size(1))
 
         if unknow_feats is not None:
-            new_features = torch.cat([interpolated_feats, unknow_feats], dim = 1)  # (B, C2 + C1, n)
+            new_features = torch.cat([interpolated_feats, unknow_feats], dim=1)  # (B, C2 + C1, n)
         else:
             new_features = interpolated_feats
 

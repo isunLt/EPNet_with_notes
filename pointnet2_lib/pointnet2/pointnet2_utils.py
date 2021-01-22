@@ -29,7 +29,7 @@ class FurthestPointSampling(Function):
         return output
 
     @staticmethod
-    def backward(xyz, a = None):
+    def backward(xyz, a=None):
         return None, None
 
 
@@ -98,7 +98,7 @@ class ThreeNN(Function):
         return torch.sqrt(dist2), idx
 
     @staticmethod
-    def backward(ctx, a = None, b = None):
+    def backward(ctx, a=None, b=None):
         return None, None
 
 
@@ -221,7 +221,7 @@ class BallQuery(Function):
         return idx
 
     @staticmethod
-    def backward(ctx, a = None):
+    def backward(ctx, a=None):
         return None, None, None, None
 
 
@@ -254,7 +254,7 @@ class QueryAndGroup(nn.Module):
         if features is not None:
             grouped_features = grouping_operation(features, idx)
             if self.use_xyz:
-                new_features = torch.cat([grouped_xyz, grouped_features], dim = 1)  # (B, C + 3, npoint, nsample)
+                new_features = torch.cat([grouped_xyz, grouped_features], dim=1)  # (B, C + 3, npoint, nsample)
             else:
                 new_features = grouped_features
         else:
@@ -281,7 +281,7 @@ class GroupAll(nn.Module):
         if features is not None:
             grouped_features = features.unsqueeze(2)
             if self.use_xyz:
-                new_features = torch.cat([grouped_xyz, grouped_features], dim = 1)  # (B, 3 + C, 1, N)
+                new_features = torch.cat([grouped_xyz, grouped_features], dim=1)  # (B, 3 + C, 1, N)
             else:
                 new_features = grouped_features
         else:

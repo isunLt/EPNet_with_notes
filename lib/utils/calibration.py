@@ -50,6 +50,7 @@ class Calibration(object):
 
     def lidar_to_rect(self, pts_lidar):
         """
+        矫正+原点变换：三维点云原点从激光雷达转换成相机0
         :param pts_lidar: (N, 3)
         :return pts_rect: (N, 3)
         """
@@ -60,6 +61,7 @@ class Calibration(object):
 
     def rect_to_img(self, pts_rect):
         """
+        坐标投影：相机坐标->像素坐标
         :param pts_rect: (N, 3)
         :return pts_img: (N, 2)
         """
